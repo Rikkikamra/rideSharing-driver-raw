@@ -57,6 +57,26 @@ const bookingSchema = new mongoose.Schema(
       default: 'app',
     },
     notes: String,
+
+    // ---------- NEW FIELDS FOR RETURN TRIP SUPPORT ----------
+    isReturn: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    parentBookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Booking',
+      default: null,
+      index: true,
+    },
+    discount: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
+    },
+    // --------------------------------------------------------
   },
   {
     timestamps: true,

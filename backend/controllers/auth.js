@@ -27,11 +27,11 @@ exports.signup = async (req, res) => {
       body: JSON.stringify({ email, phone })
     });
     const otpData = await otpRes.json();
-    console.log('OTP Sent:', otpData.success || otpData.message);
+//     console.log('OTP Sent:', otpData.success || otpData.message);
 
 
     const deviceInfo = req.headers['user-agent'];
-    console.log('New Signup from Device:', deviceInfo);
+//     console.log('New Signup from Device:', deviceInfo);
 
     const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
 

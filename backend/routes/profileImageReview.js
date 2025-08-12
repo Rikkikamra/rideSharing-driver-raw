@@ -2,10 +2,19 @@
 const express = require('express');
 const router = express.Router();
 const Driver = require('../models/Driver');
-const { verifyToken } = require('../middleware/authMiddleware');
+// Use the authenticate middleware from authMiddleware.  The previous
+// import referenced verifyToken, which does not exist.  See
+// backend/middleware/authMiddleware.js for implementation details.
+const authenticate = require('../middleware/authMiddleware');
 
-// POST /api/driver/profile-image-review
-router.post('/profile-image-review', verifyToken, async (req, res) => {
+// POST /api/profile/image-review
+//
+// This route is mounted under `/api/profile/image-review` in
+// server.js.  Therefore its own path should be `/` so that the
+// final route becomes exactly `/api/profile/image-review` when
+// called from the client.  Defining an extra segment here would
+// duplicate the path and break the endpoint.
+router.post('/', authenticate, async (req, res) => {
   try {
     const driverId = req.user.id;
     const { imageUrl } = req.body;

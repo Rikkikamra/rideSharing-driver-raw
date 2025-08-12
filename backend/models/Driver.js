@@ -3,7 +3,6 @@ const bcrypt = require('bcrypt');
 
 const driverSchema = new mongoose.Schema(
   {
-  pendingProfileImage: { type: String, default: '' },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -16,6 +15,15 @@ const driverSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    onboardingStatus: {
+      type: String,
+      enum: ['submitted', 'in_review', 'approved', 'rejected'],
+      default: 'submitted'
+    }, 
+    rejectionReason: {
+      type: String,
+      default: ''
+    },
     licenseExpiry: {
       type: Date,
       required: true,
@@ -23,7 +31,7 @@ const driverSchema = new mongoose.Schema(
     vehicle: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Vehicle',
-      required: true,
+      // required: true, // Not enforced on arrays by Mongoose
     }],
     approved: {
       type: Boolean,
@@ -55,7 +63,18 @@ const driverSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
-    profilePhoto: String,
+
+    // IMAGE FIELDS
+    profileImage: { type: String, default: '' },   // Driver's avatar
+    pendingProfileImage: { type: String, default: '' }, // For admin approval
+    profileImageStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'approved',
+    },
+    licenseImage: { type: String, default: '' }, // License scan upload
+
+    // Tiers, statuses, security, notes
     driverTier: {
       type: String,
       enum: ['standard', 'premium', 'elite'],

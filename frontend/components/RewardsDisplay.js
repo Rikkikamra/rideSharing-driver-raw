@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import apiClient from '../utils/api';
 import { View, Text, StyleSheet, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { useTheme } from '@react-navigation/native';
 import { ProgressViewIOS } from '@react-native-community/progress-view';
@@ -23,11 +24,10 @@ export default function RewardsDisplay({ userId }) {
       setLoading(true);
       setError(null);
       try {
-        // Production API endpoint (adjust as needed)
-        const res = await fetch(`/api/rewards/${userId}`);
-        if (!res.ok) throw new Error('Could not fetch rewards');
-        const data = await res.json();
-        if (mounted) setRewards(data);
+        // Use the shared Axios client to fetch rewards.  This ensures
+        // that the base URL and auth headers are consistent across the app.
+        const res = await apiClient.get(`/rewards/${userId}`);
+        if (mounted) setRewards(res.data);
       } catch (err) {
         if (mounted) setError('Unable to load rewards');
       } finally {

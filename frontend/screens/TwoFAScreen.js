@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useTheme } from '../theme/ThemeContext';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { useNotification } from '../context/NotificationContext';
+import { useTheme } from '../context/ThemeContext';
+// Import 2FA helpers from the shared API utility.  The previous
+// relative path pointed outside the project hierarchy and caused
+// module resolution errors.  This path assumes that
+// TwoFAScreen.js resides in frontend/screens and utils/api.js lives
+// one directory up in frontend/utils.
 import { verifyTwoFACode, sendTwoFACode } from '../utils/api';
 
 const TwoFAScreen = ({ navigation, route }) => {
+  const { notify } = useNotification();
   const { colors } = useTheme();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -12,16 +19,16 @@ const TwoFAScreen = ({ navigation, route }) => {
 
   const handleVerify = async () => {
     if (!code.trim()) {
-      Alert.alert('Error', 'Please enter the 2FA code.');
+      notify('Error', 'Please enter the 2FA code.');
       return;
     }
     setLoading(true);
     const result = await verifyTwoFACode(userId, code);
     setLoading(false);
     if (result?.success) {
-      navigation.replace('Let's Drive');
+      navigation.replace("Let's Drive");
     } else {
-      Alert.alert('Invalid Code', result?.message || 'Incorrect or expired code.');
+      notify('Invalid Code', result?.message || 'Incorrect or expired code.');
       setCode('');
     }
   };
@@ -35,7 +42,7 @@ const TwoFAScreen = ({ navigation, route }) => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}> 
       <Text style={[styles.title, { color: colors.primary }]}>Two-Factor Authentication</Text>
       <Text style={{ color: colors.text, marginBottom: 12 }}>
         Enter the 2FA code sent to your registered contact.

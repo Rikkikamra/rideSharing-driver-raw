@@ -4,9 +4,12 @@ const router = express.Router();
 const Booking = require('../models/Booking');
 const Ride = require('../models/Ride');
 const Vehicle = require('../models/Vehicle');
-const authMiddleware = require('../middleware/auth');
 
-router.post('/driver-confirm', authMiddleware, async (req, res) => {
+// Use the unified authentication middleware.  This module exports a
+// single function that verifies the bearer token and attaches `req.user`.
+const authenticate = require('../middleware/authMiddleware');
+
+router.post('/driver-confirm', authenticate, async (req, res) => {
   try {
     const { rideId, vehicleId, acceptedReturn } = req.body;
     const driverId = req.user.id;

@@ -1,34 +1,30 @@
-
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import MapComponent from '../components/MapComponent';
+import { fetchRoute } from '../utils/mapsAPI';
 
 const TripDetailsScreen = ({ route }) => {
   const { trip } = route.params;
   const [fromLocation, setFromLocation] = useState(null);
   const [toLocation, setToLocation] = useState(null);
+  const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-        const geocodeLocation = async (address) => {
+    async function getRoute() {
       try {
-        const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=YOUR_GOOGLE_MAPS_API_KEY`);
-        const data = await response.json();
-        if (data.results?.length > 0) {
-          const loc = data.results[0].geometry.location;
-          return { latitude: loc.lat, longitude: loc.lng };
-        }
+        setLoading(true);
+        const data = await fetchRoute(trip.from, trip.to);
+        setFromLocation(data.fromLocation);
+        setToLocation(data.toLocation);
+        setRouteCoordinates(data.routeCoordinates);
       } catch (err) {
-        console.error('Geocoding error:', err);
+        Alert.alert('Error', err?.response?.data?.error || 'Could not fetch route.');
+      } finally {
+        setLoading(false);
       }
-      return null;
-    };
-
-    const fetchLocations = async () => {
-      setFromLocation(await geocodeLocation(trip.from));
-      setToLocation(await geocodeLocation(trip.to));
-    };
-
-    fetchLocations();
+    }
+    getRoute();
   }, [trip]);
 
   return (
@@ -38,7 +34,15 @@ const TripDetailsScreen = ({ route }) => {
       <Text style={styles.label}>Date: {trip.date}</Text>
 
       <View style={styles.mapContainer}>
-        <MapComponent fromLocation={fromLocation} toLocation={toLocation} />
+        {loading ? (
+          <ActivityIndicator size="large" color="#E4572E" />
+        ) : (
+          <MapComponent
+            fromLocation={fromLocation}
+            toLocation={toLocation}
+            routeCoordinates={routeCoordinates}
+          />
+        )}
       </View>
     </View>
   );
@@ -47,7 +51,7 @@ const TripDetailsScreen = ({ route }) => {
 const styles = StyleSheet.create({
   container: { padding: 20 },
   label: { fontSize: 16, marginBottom: 8 },
-  mapContainer: { marginTop: 20 }
+  mapContainer: { marginTop: 20, height: 300 }
 });
 
 export default TripDetailsScreen;

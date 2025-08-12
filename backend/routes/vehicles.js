@@ -1,33 +1,34 @@
-
 const express = require('express');
 const router = express.Router();
-const Vehicle = require('../models/vehicle');
+const vehicleController = require('../controllers/vehicles');
+const authMiddleware = require('../middleware/authMiddleware');
+const multer = require('multer');
+const path = require('path');
+
+// Configure multer for file storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/vehicles/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.fieldname + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage });
 
 // Fetch verified vehicles for a driver
-router.get('/', authMiddleware, '/', async (req, res) => {
-  const { driverId } = req.query;
-  try {
-    const vehicles = await Vehicle.find({ driverId, verified: true });
-    res.json({ success: true, vehicles });
-  } catch (err) {
-    console.error('Fetch vehicles error:', err);
-    res.status(500).json({ success: false });
-  }
-});
+router.get('/', authMiddleware, vehicleController.getVerifiedVehicles);
 
-// Submit a new vehicle
-router.post('/', authMiddleware, '/', async (req, res) => {
-  try {
-    const newVehicle = new Vehicle({
-      ...req.body,
-      verified: false, // Pending admin verification
-    });
-    await newVehicle.save();
-    res.json({ success: true, message: 'Vehicle submitted for review' });
-  } catch (err) {
-    console.error('Submit vehicle error:', err);
-    res.status(500).json({ success: false });
-  }
-});
+// Submit a new vehicle (with files)
+router.post(
+  '/',
+  authMiddleware,
+  upload.fields([
+    { name: 'registrationFile', maxCount: 1 },
+    { name: 'insuranceFile', maxCount: 1 }
+  ]),
+  vehicleController.submitVehicle
+);
 
 module.exports = router;

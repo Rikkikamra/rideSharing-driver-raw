@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import * as Location from 'expo-location';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
+// [ADDED] Import backend API utility:
+import api from '../utils/api';
 
 const LocationCheckScreen = ({ navigation }) => {
   const { colors } = useTheme();
@@ -10,22 +12,44 @@ const LocationCheckScreen = ({ navigation }) => {
 
   useEffect(() => {
     (async () => {
-      let { status: permStatus } = await Location.requestForegroundPermissionsAsync();
-      if (permStatus !== 'granted') {
-        setStatus('denied');
-        setMessage('Location permission denied. Please enable location to continue.');
-      } else {
+      try {
+        let { status: permStatus } = await Location.requestForegroundPermissionsAsync();
+        if (permStatus !== 'granted') {
+          setStatus('denied');
+          setMessage('Location permission denied. Please enable location to continue.');
+          return;
+        }
         let location = await Location.getCurrentPositionAsync({});
-        if (location) {
-          setStatus('granted');
-          setTimeout(() => navigation.replace('Let's Drive'), 1200);
-        } else {
+        if (!location) {
           setStatus('error');
           setMessage('Unable to retrieve location. Please try again.');
+          return;
         }
+        // [ADDED] Backend integration: send coordinates for validation
+        const response = await api.post('/location-check', {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+        if (response.data?.allowed) {
+          setStatus('granted');
+          setTimeout(() => navigation.replace("Let's Drive"), 1200);
+        } else {
+          setStatus('error');
+          setMessage(
+            response.data?.message ||
+            'Your location does not meet requirements to continue.'
+          );
+        }
+      } catch (error) {
+        setStatus('error');
+        setMessage(
+          error?.response?.data?.message ||
+          error?.message ||
+          'Error verifying location. Please try again.'
+        );
       }
     })();
-  }, []);
+  }, [navigation]); // [CHANGED] Add navigation as dependency for best practice
 
   if (status === 'checking') {
     return (
@@ -56,10 +80,10 @@ const LocationCheckScreen = ({ navigation }) => {
   if (status === 'error') {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.danger, marginBottom: 12 }}>{message}</Text>
+        <Text style={{ color: colors.danger || 'red', marginBottom: 12 }}>{message}</Text>
         <TouchableOpacity
           style={[styles.btn, { backgroundColor: colors.primary }]}
-          onPress={() => navigation.replace('Let's Drive')}
+          onPress={() => navigation.replace('LocationCheck')}
         >
           <Text style={{ color: '#fff', fontWeight: '600' }}>Retry</Text>
         </TouchableOpacity>

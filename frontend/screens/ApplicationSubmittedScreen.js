@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 const ApplicationSubmittedScreen = ({ navigation, route }) => {
   const { firstName, lastName } = route.params;

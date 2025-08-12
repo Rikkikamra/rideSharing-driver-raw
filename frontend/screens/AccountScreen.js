@@ -1,13 +1,14 @@
 import React, { useContext, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useNotification } from '../context/NotificationContext';
 import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../context/AuthProvider';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
-import axios from 'axios';
-import { API_BASE_URL } from '../config';
+import apiClient from '../utils/api';
 
 const AccountScreen = () => {
+  const { notify } = useNotification();
   const { user } = useContext(AuthContext);
   const { colors } = useTheme();
   const navigation = useNavigation();
@@ -15,6 +16,16 @@ const AccountScreen = () => {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
 
+  /**
+   * Pick an image from the user’s gallery and submit it for review.
+   *
+   * The back‑end expects a JSON payload with an `imageUrl` property on
+   * the `/driver/profile-image-review` endpoint.  Rather than sending
+   * multipart form data to a non‑existent route, we simply send the
+   * local URI as the URL.  In a real deployment you could upload
+   * the image to a CDN (e.g. S3 or Cloudinary) and send that URL
+   * instead.
+   */
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -25,23 +36,16 @@ const AccountScreen = () => {
     if (!result.canceled) {
       try {
         setUploading(true);
-        const formData = new FormData();
-        formData.append('image', {
-          uri: result.assets[0].uri,
-          name: 'profile.jpg',
-          type: 'image/jpeg',
+        // Post the image URI to the profile image review endpoint.  The route
+        // is mounted at `/api/profile/image-review` with a route path of `/`,
+        // therefore the client path is `/profile/image-review`.
+        await apiClient.post('/profile/image-review', {
+          imageUrl: result.assets[0].uri,
         });
-
-        await axios.post(`${API_BASE_URL}/driver/profile/upload-pending-image`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${user.token}`,
-          },
-        });
-
-        setMessage('Image update is subject to admin approval.');
+        setMessage('Image submitted for review. An admin will approve it shortly.');
       } catch (error) {
-        Alert.alert('Upload Failed', 'Could not upload image. Try again later.');
+        console.error('Profile image upload error', error);
+        notify('Upload Failed', 'Could not upload image. Try again later.');
       } finally {
         setUploading(false);
       }
@@ -49,7 +53,7 @@ const AccountScreen = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}> 
       <Text style={[styles.header, { color: colors.primary }]}>Account Information</Text>
 
       <View style={styles.profileSection}>

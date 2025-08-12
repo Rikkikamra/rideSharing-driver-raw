@@ -1,10 +1,34 @@
+// frontend/screens/HelpCenterScreen.js
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, ScrollView, ActivityIndicator } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import axios from 'axios';
+import { API_BASE_URL } from '@env';
 
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking, ScrollView } from 'react-native';
-import { useTheme } from '../theme/ThemeContext';
+// Use the unified API_BASE_URL from the environment.  See the `.env`
+// file at the project root for configuration.  Do not fall back to
+// hard‑coded values so that the application can be pointed to
+// development, staging or production servers without code changes.
 
-const HelpCenterScreen = () => {
+export default function HelpCenterScreen() {
   const { colors } = useTheme();
+  const [faqs, setFaqs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    axios.get(`${API_BASE_URL}/faqs`)
+      .then(res => {
+        if (mounted) {
+          setFaqs(res.data.faqs || []);
+          setLoading(false);
+        }
+      })
+      .catch(err => {
+        setLoading(false);
+      });
+    return () => { mounted = false };
+  }, []);
 
   const openSupport = () => {
     Linking.openURL('mailto:support@swiftcampus.com');
@@ -13,7 +37,6 @@ const HelpCenterScreen = () => {
   return (
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
       <Text style={[styles.header, { color: colors.primary }]}>Help Center</Text>
-
       <Text style={[styles.text, { color: colors.text }]}>
         Need help with your account, trips, or payments? Browse our FAQs or contact support.
       </Text>
@@ -27,13 +50,22 @@ const HelpCenterScreen = () => {
 
       <View style={[styles.card, { backgroundColor: colors.card }]}>
         <Text style={[styles.title, { color: colors.primary }]}>FAQs</Text>
-        <Text style={[styles.description, { color: colors.text }]}>• How to update vehicle documents?</Text>
-        <Text style={[styles.description, { color: colors.text }]}>• What to do if a rider cancels?</Text>
-        <Text style={[styles.description, { color: colors.text }]}>• How to request a payout?</Text>
+        {loading ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : faqs.length > 0 ? (
+          faqs.map((faq, idx) => (
+            <View key={faq._id || idx} style={{ marginBottom: 14 }}>
+              <Text style={[styles.description, { color: colors.text, fontWeight: 'bold' }]}>{faq.question}</Text>
+              <Text style={[styles.description, { color: colors.text }]}>{faq.answer}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={[styles.description, { color: colors.text }]}>No FAQs available at the moment.</Text>
+        )}
       </View>
     </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -68,5 +100,3 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 });
-
-export default HelpCenterScreen;

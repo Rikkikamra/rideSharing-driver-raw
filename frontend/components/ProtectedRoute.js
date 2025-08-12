@@ -1,11 +1,11 @@
 
-import React from 'react';
+import React, { useContext } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { useAuth } from '../context/AuthContext';
+import { AuthContext } from '../context/AuthProvider';
 
 const ProtectedRoute = (WrappedComponent) => {
   return (props) => {
-    const { token, loading } = useAuth();
+    const { authToken, loading } = useContext(AuthContext);
 
     if (loading) {
       return (
@@ -15,7 +15,7 @@ const ProtectedRoute = (WrappedComponent) => {
       );
     }
 
-    if (!token) {
+    if (!authToken) {
       props.navigation.replace('Login');
       return null;
     }

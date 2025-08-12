@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { View, Text, Button, Alert, ActivityIndicator } from 'react-native';
+import { useNotification } from '../context/NotificationContext';
 import ReactNativeBiometrics from 'react-native-biometrics';
 
 export default function BiometricAuth({ onSuccess, onFailure }) {
   const [loading, setLoading] = useState(false);
 
-  const handleBiometric = async () => {
+  const handleBiometric = 
+  const { notify } = useNotification();async () => {
     setLoading(true);
     const rnBiometrics = new ReactNativeBiometrics();
 
     try {
       const { available, biometryType } = await rnBiometrics.isSensorAvailable();
       if (!available) {
-        Alert.alert('Biometrics Not Available', 'No biometric sensors found on this device.');
+        notify('Biometrics Not Available', 'No biometric sensors found on this device.');
         onFailure && onFailure();
         setLoading(false);
         return;
@@ -23,11 +25,11 @@ export default function BiometricAuth({ onSuccess, onFailure }) {
       if (success) {
         onSuccess && onSuccess();
       } else {
-        Alert.alert('Authentication Failed', 'Biometric authentication was not successful.');
+        notify('Authentication Failed', 'Biometric authentication was not successful.');
         onFailure && onFailure();
       }
     } catch (e) {
-      Alert.alert('Error', 'An error occurred during biometric authentication.');
+      notify('Error', 'An error occurred during biometric authentication.');
       onFailure && onFailure();
     } finally {
       setLoading(false);

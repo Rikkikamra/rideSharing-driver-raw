@@ -43,6 +43,14 @@ const vehicleSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    registrationFile: {
+      type: String,
+      required: true,
+    },
+    insuranceFile: {
+      type: String,
+      required: true,
+    },
     isActive: {
       type: Boolean,
       default: true,

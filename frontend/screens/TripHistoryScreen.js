@@ -1,67 +1,99 @@
-
 import React, { useEffect, useState, useContext } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
-import { useTheme } from '@react-navigation/native';
-import axios from 'axios';
+import { ScrollView, View, Text, ActivityIndicator, RefreshControl } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import apiClient from '../utils/api';
 import { AuthContext } from '../context/AuthProvider';
 
-const API_BASE_URL = '/api';
-
-export default function TripHistoryScreen({ navigation }) {
+const TripHistoryScreen = () => {
   const { colors } = useTheme();
-  const { user } = useContext(AuthContext);
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const { user } = useContext(AuthContext);
+
+  const fetchTrips = async () => {
+    setLoading(true);
+    try {
+      if (!user) throw new Error('No authenticated user');
+      const riderId = user._id || user.id;
+      const { data } = await apiClient.get(`/bookings/rider/${riderId}`);
+      const bookings = Array.isArray(data) ? data : data.bookings || [];
+      const mapped = bookings.map(b => {
+        const ride = b.ride || {};
+        return {
+          id: b._id || ride._id || `${ride.from}-${ride.to}-${b.createdAt}`,
+          date: ride.date || ride.createdAt || b.createdAt,
+          from: ride.from,
+          to: ride.to,
+          price: ride.fare ?? b.fare,
+          status: b.status || ride.status,
+        };
+      });
+      setTrips(mapped);
+    } catch (err) {
+      console.error(err);
+      setTrips([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchHistory() {
-      setLoading(true);
-      setError('');
-      try {
-        const res = await axios.get(`${API_BASE_URL}/trips/history`, { headers: { 'x-user-id': user?._id } });
-        setTrips(res.data.trips || []);
-      } catch {
-        setError('Could not load trip history.');
-      } finally {
-        setLoading(false);
-      }
-    }
-    if (user?._id) fetchHistory();
-  }, [user]);
+    fetchTrips();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  if (loading) return <ActivityIndicator style={{ marginTop: 40 }} size="large" color={colors.primary} />;
-  if (error) return <View style={styles.center}><Text style={{ color: '#c00' }}>{error}</Text></View>;
-  if (!trips.length) return <View style={styles.center}><Text style={{ color: colors.text, marginTop: 20 }}>No past trips found.</Text></View>;
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTrips();
+    setRefreshing(false);
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.header, { color: colors.primary }]}>Trip History</Text>
-      <FlatList
-        data={trips}
-        keyExtractor={item => item._id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('TripDetailsScreen', { trip: item })}
-            style={[styles.tripCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
+    <ScrollView
+      style={{ flex: 1, padding: 16, backgroundColor: colors.background }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      {trips.length === 0 ? (
+        <Text style={{ color: colors.text, textAlign: 'center' }}>No trips found.</Text>
+      ) : (
+        trips.map(trip => (
+          <View
+            key={trip.id}
+            style={{
+              backgroundColor: colors.card,
+              borderRadius: 12,
+              padding: 14,
+              marginBottom: 12,
+              elevation: 1,
+            }}
           >
-            <Text style={[styles.route, { color: colors.text }]}>{item.from} ➝ {item.to}</Text>
-            <Text style={[styles.date, { color: colors.text }]}>{new Date(item.date).toLocaleDateString()} {item.time}</Text>
-            <Text style={styles.price}>${item.price}</Text>
-          </TouchableOpacity>
-        )}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      />
-    </View>
+            <Text style={{ fontWeight: 'bold', color: colors.text }}>{String(trip.date)}</Text>
+            <Text style={{ color: colors.text }}>
+              {trip.from} → {trip.to}
+            </Text>
+            <Text style={{ color: colors.text }}>{trip.price}</Text>
+            <Text
+              style={{
+                color: trip.status === 'Completed' ? colors.success : colors.error,
+                fontWeight: '600',
+              }}
+            >
+              {trip.status}
+            </Text>
+          </View>
+        ))
+      )}
+    </ScrollView>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  header: { fontSize: 22, fontWeight: 'bold', marginBottom: 14 },
-  tripCard: { padding: 15, borderRadius: 12, marginBottom: 13, borderWidth: 1.5, elevation: 1 },
-  route: { fontSize: 17, fontWeight: 'bold', marginBottom: 3 },
-  date: { color: '#775222', marginBottom: 4 },
-  price: { color: '#b15518', fontWeight: 'bold', marginTop: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' }
-});
+export default TripHistoryScreen;

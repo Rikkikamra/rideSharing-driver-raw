@@ -1,35 +1,48 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { useTheme } from '../theme/ThemeContext';
+import React, { useContext } from 'react';
+import { ScrollView, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
+import { AuthContext } from '../context/AuthProvider';
 
 const SettingsScreen = ({ navigation }) => {
   const { colors } = useTheme();
+  const { logout } = useContext(AuthContext);
+
+  // Optionally allow logout from settings
+  const handleLogout = async () => {
+    await logout();
+    navigation.replace('LoginScreen');
+  };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={styles.container}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentContainerStyle={styles.container}
+    >
       <Text style={[styles.header, { color: colors.primary }]}>Settings</Text>
-      <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Profile')}>
-        <Ionicons name="person-outline" size={22} color={colors.primary} />
-        <Text style={[styles.label, { color: colors.text }]}>Profile</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('ChangePassword')}>
+
+      <TouchableOpacity
+        style={styles.row}
+        onPress={() => navigation.navigate('ChangePassword')}
+      >
         <Ionicons name="lock-closed-outline" size={22} color={colors.primary} />
         <Text style={[styles.label, { color: colors.text }]}>Change Password</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Rewards')}>
-        <Ionicons name="gift-outline" size={22} color={colors.primary} />
-        <Text style={[styles.label, { color: colors.text }]}>Rewards</Text>
+
+      <TouchableOpacity
+        style={styles.row}
+        onPress={() => navigation.navigate('TermsPolicy')}
+      >
+        <Ionicons
+          name="information-circle-outline"
+          size={22}
+          color={colors.primary}
+        />
+        <Text style={[styles.label, { color: colors.text }]}>Terms & Policy</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('HelpCenter')}>
-        <Ionicons name="help-circle-outline" size={22} color={colors.primary} />
-        <Text style={[styles.label, { color: colors.text }]}>Help Center</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('About')}>
-        <Ionicons name="information-circle-outline" size={22} color={colors.primary} />
-        <Text style={[styles.label, { color: colors.text }]}>About</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.logoutBtn} onPress={() => navigation.replace('Login')}>
+
+      {/* Leave logout optional in settings; remove if you prefer it only in the menu */}
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={{ color: '#fff', fontWeight: '600' }}>Logout</Text>
       </TouchableOpacity>
     </ScrollView>

@@ -1,7 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import axios from 'axios';
+// Use the configured API client rather than raw axios.  This ensures
+// tokens are attached and the base URL is respected.
+import apiClient from '../utils/api';
 
 const RideSuggestionsBox = ({ onSelect }) => {
   const [suggestions, setSuggestions] = useState([]);
@@ -9,18 +11,15 @@ const RideSuggestionsBox = ({ onSelect }) => {
   useEffect(() => {
     const fetchSuggestions = async () => {
       try {
-        const response = await axios.get('https://api.swiftcampus.com/suggestions', {
-          headers: {
-            'x-user-id': 'user123',
-            'x-user-role': 'student',
-            'x-user-city': 'Austin'
-          }
-        });
-        if (response.data.success) {
-          setSuggestions(response.data.suggestions);
+        // The `/rebook/suggestions` endpoint returns the five most recent
+        // rides for the authenticated user.  This replaces the old
+        // `/suggestions` call which had no server implementation.
+        const { data } = await apiClient.get('/rebook/suggestions');
+        if (data && data.success) {
+          setSuggestions(data.suggestions || []);
         }
       } catch (err) {
-        console.error('Failed to load suggestions');
+        console.error('Failed to load ride suggestions', err);
       }
     };
     fetchSuggestions();
