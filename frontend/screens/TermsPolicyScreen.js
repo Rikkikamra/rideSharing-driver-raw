@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ScrollView, Text, StyleSheet } from 'react-native';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 const TermsPolicyScreen = () => {
   const { colors } = useTheme();

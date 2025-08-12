@@ -1,6 +1,6 @@
-import React, { useLayoutEffect }, { useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 import MenuPanel from '../components/MenuPanel';
 import RideCard from '../components/RideCard';
 import WeatherWidget from '../components/WeatherWidget';
@@ -9,31 +9,46 @@ import { fetchAvailableRides, fetchDriverEarnings } from '../utils/api';
 import { Ionicons } from '@expo/vector-icons';
 
 const LetsDriveScreen = ({ navigation }) => {
-  const { colors, isDarkMode } = useTheme();
+  const { colors } = useTheme();
   const [menuVisible, setMenuVisible] = useState(false);
   const [rides, setRides] = useState([]);
   const [earnings, setEarnings] = useState({ day: 0, week: 0, month: 0 });
   const [refreshing, setRefreshing] = useState(false);
 
+  // Fetch all open rides from the server.  Wrap in try/catch
+  // to handle potential network errors gracefully.
   const loadRides = async () => {
     setRefreshing(true);
-    const available = await fetchAvailableRides();
-    setRides(available || []);
-    setRefreshing(false);
+    try {
+      const available = await fetchAvailableRides();
+      setRides(available || []);
+    } catch (err) {
+      console.error('Error loading rides', err);
+      setRides([]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
+  // Fetch the driver’s earnings for the current day, week and month.
   const loadEarnings = async () => {
-    const data = await fetchDriverEarnings();
-    setEarnings(data || { day: 0, week: 0, month: 0 });
+    try {
+      const data = await fetchDriverEarnings();
+      setEarnings(data || { day: 0, week: 0, month: 0 });
+    } catch (err) {
+      console.error('Error loading earnings', err);
+      setEarnings({ day: 0, week: 0, month: 0 });
+    }
   };
 
+  // On component mount, load rides and earnings
   useEffect(() => {
     loadRides();
     loadEarnings();
   }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}> 
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.primary }]}>Let's Drive</Text>
         <TouchableOpacity onPress={() => setMenuVisible(true)}>

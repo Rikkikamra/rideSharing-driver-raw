@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share } from 'react-native';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 const ReferAndEarnScreen = () => {
   const { colors } = useTheme();

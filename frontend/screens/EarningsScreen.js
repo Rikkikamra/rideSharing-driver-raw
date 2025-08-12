@@ -1,7 +1,8 @@
-
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
+// Import from the correct relative path.  This file is in `frontend/screens`
+// so `../utils/api` resolves to `frontend/utils/api`.
 import { fetchDriverEarnings } from '../utils/api';
 
 const EarningsScreen = () => {
@@ -24,21 +25,31 @@ const EarningsScreen = () => {
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={loadEarnings} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={loadEarnings}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={[styles.header, { color: colors.primary }]}>Your Earnings</Text>
       <View style={[styles.card, { backgroundColor: colors.card }]}>
         <Text style={[styles.label, { color: colors.text }]}>Today</Text>
-        <Text style={[styles.amount, { color: colors.primary }]}>${earnings.day.toFixed(2)}</Text>
+        <Text style={[styles.amount, { color: colors.primary }]}>
+          ${earnings.day.toFixed(2)}
+        </Text>
       </View>
       <View style={[styles.card, { backgroundColor: colors.card }]}>
         <Text style={[styles.label, { color: colors.text }]}>This Week</Text>
-        <Text style={[styles.amount, { color: colors.primary }]}>${earnings.week.toFixed(2)}</Text>
+        <Text style={[styles.amount, { color: colors.primary }]}>
+          ${earnings.week.toFixed(2)}
+        </Text>
       </View>
       <View style={[styles.card, { backgroundColor: colors.card }]}>
         <Text style={[styles.label, { color: colors.text }]}>This Month</Text>
-        <Text style={[styles.amount, { color: colors.primary }]}>${earnings.month.toFixed(2)}</Text>
+        <Text style={[styles.amount, { color: colors.primary }]}>
+          ${earnings.month.toFixed(2)}
+        </Text>
       </View>
     </ScrollView>
   );

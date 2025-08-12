@@ -2,6 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import axios from 'axios';
+// Use the API base URL defined in your environment.  Avoid hard‑coding
+// production domains so the app can point to dev/staging servers.
+import { API_BASE_URL } from '@env';
 
 const FareEstimateBox = ({ from, to, riderType = 'regular', quietMode = false }) => {
   const [fare, setFare] = useState(null);
@@ -12,7 +15,7 @@ const FareEstimateBox = ({ from, to, riderType = 'regular', quietMode = false })
     const fetchFare = async () => {
       setLoading(true);
       try {
-        const response = await axios.post('https://api.swiftcampus.com/fare/estimate', {
+        const response = await axios.post(`${API_BASE_URL}/fare/estimate`, {
           from,
           to,
           riderType,

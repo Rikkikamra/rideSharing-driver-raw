@@ -1,28 +1,44 @@
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNotification } from '../context/NotificationContext';
+import { useTheme } from '../context/ThemeContext';
 
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+export default function ApplicationRejectedScreen() {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { reason = 'Unfortunately, your application was not approved.' } = route.params || {};
+  const { notify } = useNotification();
+  const { colors } = useTheme();
 
-export default function ApplicationRejectedScreen({ navigation }) {
+  useEffect(() => {
+    notify('Application Rejected', reason);
+  }, [notify, reason]);
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Application Rejected</Text>
-      <Text style={styles.subtitle}>
-        Unfortunately, your application was not approved. You may review and resubmit your details for consideration.
+    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.title, { color: colors.error }]}>Application Rejected</Text>
+      <Text style={[styles.reasonLabel, { color: colors.text }]}>Reason:</Text>
+      <Text style={[styles.reasonText, { color: colors.text }]}>{reason}</Text>
+      <Text style={[styles.subtitle, { color: colors.muted }]}>
+        You may review your details and resubmit for reconsideration.
       </Text>
       <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.replace('DriverOnboardingScreen')}
+        style={[styles.button, { backgroundColor: colors.primary }]}
+        onPress={() => navigation.navigate('ApplicationForm')} // <-- use your actual route name
       >
         <Text style={styles.buttonText}>Resubmit Application</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#fff' },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#E4572E', marginBottom: 16 },
-  subtitle: { fontSize: 16, textAlign: 'center', color: '#555', marginBottom: 24 },
-  button: { backgroundColor: '#E4572E', padding: 14, borderRadius: 8 },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  container: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
+  reasonLabel: { fontSize: 16, fontWeight: '600', alignSelf: 'flex-start', marginBottom: 4 },
+  reasonText: { fontSize: 16, marginBottom: 16, alignSelf: 'flex-start' },
+  subtitle: { fontSize: 16, textAlign: 'center', marginBottom: 24 },
+  button: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
+    fcmToken: {
+      type: String,
+      default: ''
+    },
     passwordHash: {
       type: String,
       required: true,
@@ -62,6 +66,10 @@ const userSchema = new mongoose.Schema(
       email: { type: Boolean, default: true },
       sms: { type: Boolean, default: false },
       push: { type: Boolean, default: true },
+    },
+    quietPreference: {
+      type: Boolean,
+      default: false,
     },
     createdVia: {
       type: String,

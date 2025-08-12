@@ -1,48 +1,97 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { COLORS, FONTS, BORDERS } from '../theme';
+// frontend/screens/auth/LoginScreen.js
 
-const LoginScreen = ({ navigation }) => {
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert
+} from 'react-native';
+import { useNavigation }      from '@react-navigation/native';
+import { useNotification }    from '../../context/NotificationContext';
+import { loginUser }          from '../../utils/api';
+import { getApplicationStatus } from '../../utils/api';
+// Use theme variables from the root theme file.  Because this screen lives in
+// the auth directory, we need to go up two directories to import the
+// shared theme instead of the non‑existent '../theme'.
+import { COLORS, FONTS, BORDERS } from '../../theme';
+
+export default function LoginScreen() {
+  const navigation = useNavigation();
+  const { notify } = useNotification();
+
   const [emailOrPhone, setEmailOrPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [password, setPassword]         = useState('');
+  const [isLoading, setIsLoading]       = useState(false);
 
   const handleLogin = async () => {
+    if (!emailOrPhone || !password) {
+      return Alert.alert('Missing fields', 'Please enter both email/phone and password.');
+    }
+
     setIsLoading(true);
     try {
-      // Login logic here
+      // 1) perform login
+      const { token } = await loginUser({ emailOrPhone, password });
+      // (store token in AsyncStorage or via your AuthContext here…)
+
+      // 2) check driver-onboarding status
+      const { status } = await getApplicationStatus();
+      if (status === 'in_review') {
+        notify({ title: 'Under Review', message: 'Your application is being reviewed.' });
+        return navigation.replace('ApplicationInReview');
+      }
+
+      // 3) on success, drop into the main app
+      notify({ title: 'Welcome Back', message: 'Login successful!' });
+      navigation.replace('MainApp');
     } catch (err) {
-      Alert.alert('Login Failed', err.message);
+      console.error('Login error:', err);
+      Alert.alert('Login Failed', err.response?.data?.message || err.message || 'Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Log In</Text>
+
       <Text style={styles.label}>Email or Phone</Text>
       <TextInput
         style={styles.input}
+        placeholder="Email or Phone"
+        placeholderTextColor={COLORS.grey}
+        autoCapitalize="none"
+        keyboardType="email-address"
         value={emailOrPhone}
         onChangeText={setEmailOrPhone}
-        placeholder="Enter your email or phone"
-        placeholderTextColor={COLORS.grey}
       />
+
       <Text style={styles.label}>Password</Text>
       <TextInput
         style={styles.input}
-        value={password}
-        onChangeText={setPassword}
         placeholder="Password"
         placeholderTextColor={COLORS.grey}
         secureTextEntry
+        value={password}
+        onChangeText={setPassword}
       />
-      <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={isLoading}>
+
+      <TouchableOpacity
+        style={[styles.button, isLoading && styles.buttonDisabled]}
+        onPress={handleLogin}
+        disabled={isLoading}
+      >
         {isLoading
           ? <ActivityIndicator color={COLORS.white} />
           : <Text style={styles.buttonText}>Log In</Text>
         }
       </TouchableOpacity>
+
       <TouchableOpacity onPress={() => navigation.navigate('SignupScreen')}>
         <Text style={styles.link}>
           Don’t have an account? <Text style={styles.linkAccent}>Sign Up</Text>
@@ -50,7 +99,7 @@ const LoginScreen = ({ navigation }) => {
       </TouchableOpacity>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -62,9 +111,8 @@ const styles = StyleSheet.create({
   title: {
     fontSize: FONTS.size.title,
     fontFamily: FONTS.bold,
-    color: COLORS.burntOrange,
+    marginBottom: 24,
     textAlign: 'center',
-    marginBottom: 36,
   },
   label: {
     color: COLORS.black,
@@ -90,6 +138,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 24,
   },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
   buttonText: {
     color: COLORS.white,
     fontFamily: FONTS.bold,
@@ -105,5 +156,3 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-
-export default LoginScreen;

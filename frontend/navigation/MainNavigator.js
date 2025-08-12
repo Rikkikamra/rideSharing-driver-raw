@@ -1,33 +1,60 @@
+// frontend/navigation/MainNavigator.js
 
-import EditProfileScreen from '../screens/EditProfileScreen';
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import LetsDriveScreen from '../screens/LetsDriveScreen';
-import EarningsScreen from '../screens/EarningsScreen';
-import AccountScreen from '../screens/AccountScreen';
-import DriverScoreScreen from '../screens/DriverScoreScreen';
-import DriverResourcesScreen from '../screens/DriverResourcesScreen';
-import TermsPolicyScreen from '../screens/TermsPolicyScreen';
-import ReferAndEarnScreen from '../screens/ReferAndEarnScreen';
-import TripHistoryScreen from '../screens/TripHistoryScreen';
-import MyVehicleScreen from '../screens/MyVehicleScreen';
+import LetsDriveScreen           from '../screens/LetsDriveScreen';
+import EarningsScreen            from '../screens/EarningsScreen';
+import TripsScreen               from '../screens/TripsScreen';
+import AccountScreen             from '../screens/AccountScreen';
+import EditProfileScreen         from '../screens/EditProfileScreen';
+// … any other existing imports …
+
+// New onboarding screens
+import ApplicationInReviewScreen   from '../screens/ApplicationInReviewScreen';
+import ApplicationApprovedScreen   from '../screens/ApplicationApprovedScreen';
+import ApplicationRejectedScreen   from '../screens/ApplicationRejectedScreen';
 
 const Stack = createNativeStackNavigator();
 
 const MainNavigator = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="LetsDriveScreen" component={LetsDriveScreen} />
-    <Stack.Screen name="EarningsScreen" component={EarningsScreen} />
-    <Stack.Screen name="AccountScreen" component={AccountScreen} />
-    <Stack.Screen name="DriverScoreScreen" component={DriverScoreScreen} />
-    <Stack.Screen name="DriverResourcesScreen" component={DriverResourcesScreen} />
-    <Stack.Screen name="TermsPolicyScreen" component={TermsPolicyScreen} />
-    <Stack.Screen name="ReferAndEarnScreen" component={ReferAndEarnScreen} />
-    <Stack.Screen name="TripHistoryScreen" component={TripHistoryScreen} />
-    <Stack.Screen name="MyVehicleScreen" component={MyVehicleScreen} />
-    <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
-</Stack.Navigator>
+    {/* Core app screens */}
+    <Stack.Screen
+      name="LetsDrive"
+      component={LetsDriveScreen}
+    />
+    <Stack.Screen
+      name="Earnings"
+      component={EarningsScreen}
+    />
+    <Stack.Screen
+      name="Trips"
+      component={TripsScreen}
+    />
+    <Stack.Screen
+      name="AccountScreen"
+      component={AccountScreen}
+    />
+    <Stack.Screen
+      name="EditProfile"
+      component={EditProfileScreen}
+    />
+
+    {/* Driver onboarding flow */}
+    <Stack.Screen
+      name="ApplicationInReview"
+      component={ApplicationInReviewScreen}
+    />
+    <Stack.Screen
+      name="ApplicationApproved"
+      component={ApplicationApprovedScreen}
+    />
+    <Stack.Screen
+      name="ApplicationRejected"
+      component={ApplicationRejectedScreen}
+    />
+  </Stack.Navigator>
 );
 
 export default MainNavigator;

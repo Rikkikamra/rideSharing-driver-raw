@@ -1,33 +1,47 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useTheme } from '../theme/ThemeContext';
-import { submitAppFeedback } from '../utils/api';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { useNotification } from '../context/NotificationContext';
+import { useTheme } from '../context/ThemeContext';
+import apiClient from '../utils/api';
 
 const FeedbackScreen = ({ navigation }) => {
+  // access notification and theme inside component to avoid invalid syntax
+  const { notify } = useNotification();
   const { colors } = useTheme();
   const [feedback, setFeedback] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
+    // Validate input
     if (!feedback.trim()) {
-      Alert.alert('Feedback required', 'Please enter your feedback.');
+      notify('Feedback required', 'Please enter your feedback.');
       return;
     }
     setLoading(true);
-    const result = await submitAppFeedback(feedback);
-    setLoading(false);
-    if (result?.success) {
-      Alert.alert('Thank you!', 'Your feedback has been submitted.');
-      navigation.goBack();
-    } else {
-      Alert.alert('Error', 'Unable to submit feedback. Please try again.');
+    try {
+      // Submit general app feedback.  The backend should expose a route
+      // such as POST `/feedback/app` to handle unscoped feedback; adjust
+      // accordingly if the endpoint differs.
+      const res = await apiClient.post('/feedback/app', { feedback: feedback.trim() });
+      setLoading(false);
+      if (res.data?.success) {
+        notify('Thank you!', 'Your feedback has been submitted.');
+        navigation.goBack();
+      } else {
+        notify('Error', res.data?.message || 'Unable to submit feedback. Please try again.');
+      }
+    } catch (err) {
+      setLoading(false);
+      notify('Error', 'Unable to submit feedback. Please try again.');
     }
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Text style={[styles.header, { color: colors.primary }]}>App Feedback</Text>
-      <Text style={{ color: colors.text, marginBottom: 10 }}>Share your suggestions or issues with us.</Text>
+      <Text style={{ color: colors.text, marginBottom: 10 }}>
+        Share your suggestions or issues with us.
+      </Text>
       <TextInput
         style={[styles.input, { borderColor: colors.primary, color: colors.text }]}
         multiline

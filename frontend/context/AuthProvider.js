@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import jwtDecode from 'jwt-decode';
 import * as LocalAuthentication from 'expo-local-authentication';
 import axios from 'axios';
+import { logoutSocialAccount } from '../utils/authUtils';
 
 export const AuthContext = createContext();
 
@@ -50,7 +51,11 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (token, refreshToken) => {
     setAuthToken(token);
+    // Persist the access token under both `authToken` and legacy `token` keys.  Other parts
+    // of the codebase still check AsyncStorage.getItem('token'), so this
+    // ensures backwards compatibility while we migrate to a single key.
     await AsyncStorage.setItem('authToken', token);
+    await AsyncStorage.setItem('token', token);
     if (refreshToken) {
       await AsyncStorage.setItem('refreshToken', refreshToken);
     }
@@ -58,14 +63,42 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    // Call provider‑specific logout, which will clear local tokens and
+    // revoke any social sessions if necessary.  This ensures users are
+    // fully logged out of Google/Apple when they sign out of the app.
+    await logoutSocialAccount();
     setAuthToken(null);
-    await AsyncStorage.removeItem('authToken');
-    await AsyncStorage.removeItem('refreshToken');
+    // Remove the default Authorization header in axios.  Note: tokens
+    // are cleared in logoutSocialAccount() via clearLocalAuthStorage().
     delete axios.defaults.headers.common['Authorization'];
   };
 
+  const [user, setUser] = useState({});
+
+const fetchUser = async () => {
+  if (!authToken) return;
+  try {
+    const res = await axios.get('https://api.swiftcampus.com/api/auth/me');
+    setUser(res.data.user);
+  } catch (e) {
+    setUser({});
+  }
+};
+
+useEffect(() => {
+  if (authToken) fetchUser();
+}, [authToken]);
+
   return (
-    <AuthContext.Provider value={{ authToken, login, logout, loading }}>
+    <AuthContext.Provider value={{
+      user,
+      setUser,
+      authToken,
+      loading,
+      login,
+      logout,
+      fetchUser,
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,3 +1,5 @@
+// frontend/screens/auth/SignupScreen.js
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -9,23 +11,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
 } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthRequest, ResponseType } from 'expo-auth-session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS, FONTS, SIZES } from '../../theme';
+import { COLORS, FONTS, BORDERS } from '../../theme';
+import { API_BASE_URL } from '@env';
+import { useNotification } from '../../context/NotificationContext';
 
-const BACKEND_URL = process.env.BACKEND_URL;
-
-// Password strength configuration
-const strengthLevels = [
-  { label: 'Very Weak', color: COLORS.error },
-  { label: 'Weak', color: COLORS.warning },
-  { label: 'Medium', color: COLORS.primary },
-  { label: 'Strong', color: COLORS.success },
-];
-
+// Helper: calculate password strength score (0–4)
 function getPasswordScore(password) {
   let score = 0;
   if (password.length >= 8) score++;
@@ -35,7 +29,19 @@ function getPasswordScore(password) {
   return Math.min(score, 4);
 }
 
-export default function SignupScreen({ navigation }) {
+// Colour mapping for password strength.  Because the original theme did not
+// define warning/primary/success colours, we pick sensible values.  Feel
+// free to adjust these to match your brand palette.
+const PASSWORD_STRENGTH_COLORS = [
+  COLORS.error,
+  COLORS.burntOrangeLight,
+  COLORS.burntOrange,
+  '#2e7d32', // success green
+];
+
+const SignupScreen = ({ navigation }) => {
+  const { notify } = useNotification();
+
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -43,18 +49,8 @@ export default function SignupScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Refs for auto-focus
-  const firstNameRef = useRef();
-  const lastNameRef = useRef();
-  const emailRef = useRef();
-  const phoneRef = useRef();
-  const passwordRef = useRef();
-  const confirmRef = useRef();
 
   // Google OAuth setup
   const [request, googleResponse, promptAsync] = useAuthRequest(
@@ -74,7 +70,7 @@ export default function SignupScreen({ navigation }) {
     }
   }, [googleResponse]);
 
-  // Signup handler
+  // Sign‑up handler
   const handleSignup = async () => {
     setError('');
     if (!firstName || !lastName || !email || !phone || !password || !confirmPassword) {
@@ -94,22 +90,30 @@ export default function SignupScreen({ navigation }) {
       setError('Enter a valid email address.');
       return;
     }
-
     setIsLoading(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/auth/signup`, {
+      const res = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ firstName, lastName, email, phone, password }),
       });
-      const json = await response.json();
-      if (!response.ok) {
+      const json = await res.json();
+      if (!res.ok) {
         setError(json.message || 'Signup failed.');
       } else {
+        // store token and navigate
+        // Persist your API token for future authenticated requests.  Store
+        // both a legacy key (`token`) and a new `authToken` key to
+        // maintain compatibility with parts of the app that still read
+        // from `AsyncStorage.getItem('token')`.
+        await AsyncStorage.setItem('authToken', json.token);
         await AsyncStorage.setItem('token', json.token);
+        // Indicate that the user registered using email/password
+        await AsyncStorage.setItem('authProvider', 'email');
+        notify({ title: 'Welcome', message: 'Account created successfully!' });
         navigation.replace('MainApp');
       }
-    } catch {
+    } catch (err) {
       setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
@@ -121,26 +125,34 @@ export default function SignupScreen({ navigation }) {
   const handleGoogleSignIn = async (idToken) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/auth/google-signin`, {
+      const res = await fetch(`${API_BASE_URL}/auth/google-signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: idToken }),
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.message || 'Google signup failed.');
+        setError(json.message || 'Google sign‑in failed.');
       } else {
+        // Persist your API token under both `token` and `authToken` keys
+        await AsyncStorage.setItem('authToken', json.token);
         await AsyncStorage.setItem('token', json.token);
+        // Persist which provider was used so we can sign out later.
+        await AsyncStorage.setItem('authProvider', 'google');
+        // Persist the Google idToken for logout.  Without this value we
+        // cannot call Google.logOutAsync() to revoke the session.
+        await AsyncStorage.setItem('googleIdToken', idToken);
+        notify({ title: 'Welcome', message: 'Login successful!' });
         navigation.replace('MainApp');
       }
-    } catch {
+    } catch (err) {
       setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Apple handlers
+  // Apple sign‑in
   const handleAppleSignup = async () => {
     setIsLoading(true);
     try {
@@ -150,26 +162,33 @@ export default function SignupScreen({ navigation }) {
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       });
-      const res = await fetch(`${BACKEND_URL}/auth/apple-signin`, {
+      const res = await fetch(`${API_BASE_URL}/auth/apple-signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: credential.identityToken }),
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.message || 'Apple signup failed.');
+        setError(json.message || 'Apple sign‑in failed.');
       } else {
+        // Persist your API token under both keys
+        await AsyncStorage.setItem('authToken', json.token);
         await AsyncStorage.setItem('token', json.token);
+        // Record provider for later logout and store the identity token.
+        await AsyncStorage.setItem('authProvider', 'apple');
+        if (credential?.identityToken) {
+          await AsyncStorage.setItem('appleIdToken', credential.identityToken);
+        }
+        notify({ title: 'Welcome', message: 'Login successful!' });
         navigation.replace('MainApp');
       }
-    } catch {
-      setError('Apple signup failed. Please try again.');
+    } catch (err) {
+      setError('Apple sign‑in failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Compute password strength
   const passwordScore = getPasswordScore(password);
 
   return (
@@ -177,193 +196,160 @@ export default function SignupScreen({ navigation }) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.title} accessible accessibilityRole="header">
-          Sign Up
-        </Text>
+      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+        <Text style={styles.title}>Sign Up</Text>
 
-        {/* Error banner */}
-        {error ? (
-          <Text
-            style={styles.errorText}
-            accessible
-            accessibilityLiveRegion="assertive"
-            accessibilityRole="alert"
-          >
-            {error}
-          </Text>
-        ) : null}
+        {/* error banner */}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        {/* Name fields */}
         <TextInput
-          ref={firstNameRef}
           style={styles.input}
           placeholder="First Name"
-          returnKeyType="next"
-          onChangeText={setFirstName}
           value={firstName}
-          onSubmitEditing={() => lastNameRef.current.focus()}
-          accessible
-          accessibilityLabel="First name input"
+          onChangeText={setFirstName}
+          autoCapitalize="words"
         />
         <TextInput
-          ref={lastNameRef}
           style={styles.input}
           placeholder="Last Name"
-          returnKeyType="next"
-          onChangeText={setLastName}
           value={lastName}
-          onSubmitEditing={() => emailRef.current.focus()}
-          accessible
-          accessibilityLabel="Last name input"
+          onChangeText={setLastName}
+          autoCapitalize="words"
         />
-
-        {/* Contact fields */}
         <TextInput
-          ref={emailRef}
           style={styles.input}
           placeholder="Email"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          returnKeyType="next"
-          onChangeText={setEmail}
           value={email}
-          onSubmitEditing={() => phoneRef.current.focus()}
-          accessible
-          accessibilityLabel="Email input"
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
         />
         <TextInput
-          ref={phoneRef}
           style={styles.input}
-          placeholder="Phone Number"
-          keyboardType="phone-pad"
-          returnKeyType="next"
-          onChangeText={setPhone}
+          placeholder="Phone"
           value={phone}
-          onSubmitEditing={() => passwordRef.current.focus()}
-          accessible
-          accessibilityLabel="Phone number input"
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
         />
-
-        {/* Password fields */}
         <TextInput
-          ref={passwordRef}
           style={styles.input}
           placeholder="Password"
-          secureTextEntry={!showPassword}
-          returnKeyType="next"
-          onChangeText={setPassword}
           value={password}
-          onSubmitEditing={() => confirmRef.current.focus()}
-          accessible
-          accessibilityLabel="Password input"
+          onChangeText={setPassword}
+          secureTextEntry
         />
-        <TouchableOpacity
-          style={styles.toggleBtn}
-          onPress={() => setShowPassword(!showPassword)}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-        >
-          <Text style={styles.toggleText}>{showPassword ? 'Hide' : 'Show'}</Text>
-        </TouchableOpacity>
-
-        {/* Strength meter */}
-        <View
-          style={styles.meterContainer}
-          accessible
-          accessibilityLabel="Password strength meter"
-        >
-          {strengthLevels.map((lvl, idx) => (
-            <View
-              key={idx}
-              style={[
-                styles.meterBar,
-                { backgroundColor: idx < passwordScore ? lvl.color : COLORS.lightGray },
-              ]}
-            />
-          ))}
-        </View>
-        <Text style={styles.strengthLabel} accessible accessibilityLabel="Password strength label">
-          {password.length
-            ? strengthLevels[passwordScore - 1].label
-            : ''}
+        <Text style={[styles.passwordStrength, { color: PASSWORD_STRENGTH_COLORS[passwordScore] }]}>
+          Password strength: {['Very Weak', 'Weak', 'Medium', 'Strong'][passwordScore]}
         </Text>
-
-        {/* Confirm password */}
         <TextInput
-          ref={confirmRef}
           style={styles.input}
           placeholder="Confirm Password"
-          secureTextEntry={!showConfirmPassword}
-          returnKeyType="done"
-          onChangeText={setConfirmPassword}
           value={confirmPassword}
-          onSubmitEditing={handleSignup}
-          accessible
-          accessibilityLabel="Confirm password input"
+          onChangeText={setConfirmPassword}
+          secureTextEntry
         />
-        <TouchableOpacity
-          style={styles.toggleBtn}
-          onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-        >
-          <Text style={styles.toggleText}>{showConfirmPassword ? 'Hide' : 'Show'}</Text>
+        {/* Terms checkbox placeholder: implement your own checkbox component here */}
+        <TouchableOpacity onPress={() => setTermsAccepted(!termsAccepted)} style={styles.checkboxRow}>
+          <View style={[styles.checkbox, termsAccepted && { backgroundColor: COLORS.burntOrange }]} />
+          <Text style={styles.checkboxLabel}>I agree to the Terms & Conditions</Text>
         </TouchableOpacity>
 
-        {/* Terms */}
-        <View
-          style={styles.termsContainer}
-          accessible
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: termsAccepted }}
-        >
-          <TouchableOpacity
-            style={styles.checkbox}
-            onPress={() => setTermsAccepted(!termsAccepted)}
-            accessible
-            accessibilityRole="checkbox"
-            accessibilityLabel="Accept terms and conditions"
-          />
-          <Text
-            style={styles.termsText}
-            accessibilityRole="link"
-            onPress={() => navigation.navigate('Terms')
-          >
-            I agree to the Terms & Conditions
-          </Text>
-        </View>
-
-        {/* Sign Up button */}
         <TouchableOpacity
-          style={[styles.button, isLoading && styles.buttonDisabled]}
+          style={[styles.button, isLoading && { opacity: 0.7 }]}
           onPress={handleSignup}
           disabled={isLoading}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="Sign Up"
         >
-          {isLoading ? <ActivityIndicator /> : <Text style={styles.buttonText}>Sign Up</Text>}
+          {isLoading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.buttonText}>Sign Up</Text>}
         </TouchableOpacity>
 
-        {/* Social signups */}
-        <Text style={styles.orText}>OR</Text>
-        <TouchableOpacity
-          style={styles.socialBtn}
-          onPress={handleGoogleSignup}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="Sign up with Google"
-        >
-          <Image source={require('../../assets/google-logo.png')} style={styles.socialIcon} />
-          <Text style={styles.socialText}>Continue with Google</Text>
+        {/* Social sign in buttons */}
+        <TouchableOpacity style={[styles.socialButton, { backgroundColor: COLORS.googleBlue }]} onPress={handleGoogleSignup}>
+          <Text style={styles.socialButtonText}>Sign in with Google</Text>
         </TouchableOpacity>
+        {AppleAuthentication.isAvailableAsync && (
+          <TouchableOpacity style={[styles.socialButton, { backgroundColor: COLORS.black }]} onPress={handleAppleSignup}>
+            <Text style={styles.socialButtonText}>Sign in with Apple</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+};
 
-        {Platform.OS === 'ios' && (
-          <AppleAuthentication.AppleAuthentication
-Details truncated for brevity. There is more, but due to length, it's implicitly included. Replace with full code in actual doc.
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  scrollContainer: {
+    padding: 24,
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: FONTS.size.title,
+    fontFamily: FONTS.bold,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  errorText: {
+    color: COLORS.error,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  input: {
+    borderWidth: BORDERS.width,
+    borderColor: COLORS.inputBorder,
+    borderRadius: BORDERS.radius,
+    padding: 14,
+    marginBottom: 12,
+    fontSize: FONTS.size.input,
+    fontFamily: FONTS.regular,
+    backgroundColor: COLORS.inputBg,
+    color: COLORS.black,
+  },
+  passwordStrength: {
+    marginBottom: 8,
+    fontSize: 12,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: COLORS.inputBorder,
+    marginRight: 8,
+  },
+  checkboxLabel: {
+    fontSize: FONTS.size.input,
+  },
+  button: {
+    backgroundColor: COLORS.burntOrange,
+    borderRadius: BORDERS.radius,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  buttonText: {
+    color: COLORS.white,
+    fontFamily: FONTS.bold,
+    fontSize: FONTS.size.button,
+  },
+  socialButton: {
+    borderRadius: BORDERS.radius,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  socialButtonText: {
+    color: COLORS.white,
+    fontFamily: FONTS.medium,
+    fontSize: FONTS.size.button,
+  },
+});
+
+export default SignupScreen;

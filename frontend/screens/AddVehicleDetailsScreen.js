@@ -1,145 +1,364 @@
-
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ScrollView,
+  ActivityIndicator
 } from 'react-native';
+import { useNotification } from '../context/NotificationContext';
 import * as DocumentPicker from 'expo-document-picker';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { fetchMakes, fetchModels } from '../utils/vehicleAPI';
+import apiClient from '../utils/api';
 
 export default function AddVehicleDetailsScreen() {
-  const [year, setYear] = useState('');
+  const [year, setYear] = useState(null);
+  const [yearOpen, setYearOpen] = useState(false);
   const [make, setMake] = useState(null);
+  const [makeOpen, setMakeOpen] = useState(false);
   const [model, setModel] = useState(null);
+  const [modelOpen, setModelOpen] = useState(false);
+
   const [makes, setMakes] = useState([]);
   const [models, setModels] = useState([]);
   const [loadingModels, setLoadingModels] = useState(false);
+
   const [licensePlate, setLicensePlate] = useState('');
   const [registrationFile, setRegistrationFile] = useState(null);
   const [insuranceFile, setInsuranceFile] = useState(null);
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [consent, setConsent] = useState(false);
 
-  
+  const [loading, setLoading] = useState(false);
+
+  const { notify } = useNotification();
+
+  // Year options (12‑year window)
+  const currentYear = new Date().getFullYear();
+  const minYear = currentYear - 12;
+  const yearOptions = Array.from({ length: currentYear - minYear + 1 }, (_, i) => {
+    const y = currentYear - i;
+    return { label: y.toString(), value: y };
+  });
+
+  // Fetch makes on mount
   useEffect(() => {
-    const loadMakes = async () => {
-      const fetchedMakes = await fetchMakes();
-      setMakes(fetchedMakes);
-    };
-    loadMakes();
+    (async () => {
+      try {
+        const data = await fetchMakes();
+        // fetchMakes returns an array of { label, value }
+        setMakes(data);
+      } catch (e) {
+        notify('Error fetching makes');
+      }
+    })();
   }, []);
 
+  // Fetch models when make changes
   useEffect(() => {
-    const loadModels = async () => {
-      if (!make) return;
-      setLoadingModels(true);
-      const fetchedModels = await fetchModels(make);
-      setModels(fetchedModels);
-      setLoadingModels(false);
-    };
-    loadModels();
-
-    fetchMakes().then(setMakes);
-  }, []);
-
-  
-  useEffect(() => {
-    const loadMakes = async () => {
-      const fetchedMakes = await fetchMakes();
-      setMakes(fetchedMakes);
-    };
-    loadMakes();
-  }, []);
-
-  useEffect(() => {
-    const loadModels = async () => {
-      if (!make) return;
-      setLoadingModels(true);
-      const fetchedModels = await fetchModels(make);
-      setModels(fetchedModels);
-      setLoadingModels(false);
-    };
-    loadModels();
-
-    if (make) {
-      setLoadingModels(true);
-      fetchModels(make).then(res => {
-        setModels(res);
+    if (!make) return;
+    setLoadingModels(true);
+    (async () => {
+      try {
+        const data = await fetchModels(make);
+        setModels(data);
+      } catch (e) {
+        notify('Error fetching models');
+      } finally {
         setLoadingModels(false);
-      });
-    } else {
-      setModels([]);
-    }
+      }
+    })();
   }, [make]);
 
-  const handleDocumentPick = async (type) => {
+  // File pickers
+  const pickRegistrationFile = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*']
+      });
       if (!result.canceled) {
-        if (type === 'registration') setRegistrationFile(result.assets[0]);
-        else setInsuranceFile(result.assets[0]);
+        // Expo SDK 48+ uses assets, else use result
+        setRegistrationFile(result.assets?.[0] || result);
       }
-    } catch (error) {
-      console.log('Document Picker Error:', error);
+    } catch (e) {
+      notify('Error picking registration file');
     }
   };
 
-  const handleSubmit = () => {
-    if (!year || !make || !model || !licensePlate || !registrationNumber || !consent || !registrationFile || !insuranceFile) {
-      Alert.alert('All fields including uploads are required');
+  const pickInsuranceFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*']
+      });
+      if (!result.canceled) {
+        setInsuranceFile(result.assets?.[0] || result);
+      }
+    } catch (e) {
+      notify('Error picking insurance file');
+    }
+  };
+
+  // Submit logic with file upload
+  const handleSubmit = async () => {
+    if (!year || !make || !model || !licensePlate || !registrationNumber || !consent) {
+      Alert.alert('Error', 'Please fill all required fields and give consent.');
       return;
     }
-    const currentYear = new Date().getFullYear();
-    const minYear = currentYear - 12;
-    if (parseInt(year) < minYear || parseInt(year) > currentYear) {
-      Alert.alert(`Vehicle must be from year ${minYear} or newer`);
+    if (!registrationFile || !insuranceFile) {
+      Alert.alert('Error', 'Please upload both Registration and Insurance files.');
       return;
     }
-    Alert.alert('Vehicle details submitted');
+
+    setLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('year', year);
+      formData.append('make', make);
+      formData.append('model', model);
+      formData.append('licensePlate', licensePlate);
+      formData.append('registrationNumber', registrationNumber);
+      formData.append('consent', consent);
+
+      // For Expo/React Native FormData: URI, name, and type required
+      formData.append('registrationFile', {
+        uri: registrationFile.uri,
+        name: registrationFile.name || 'registration.pdf',
+        type: registrationFile.mimeType || 'application/pdf'
+      });
+
+      formData.append('insuranceFile', {
+        uri: insuranceFile.uri,
+        name: insuranceFile.name || 'insurance.pdf',
+        type: insuranceFile.mimeType || 'application/pdf'
+      });
+
+      // POST using the configured apiClient so auth headers are added automatically
+      const response = await apiClient.post(
+        '/vehicles',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      if (response.data.success) {
+        Alert.alert('Success', 'Vehicle submitted for review!');
+        // Reset form
+        setYear(null);
+        setMake(null);
+        setModel(null);
+        setLicensePlate('');
+        setRegistrationNumber('');
+        setConsent(false);
+        setRegistrationFile(null);
+        setInsuranceFile(null);
+      } else {
+        Alert.alert('Error', response.data.message || 'Submission failed');
+      }
+    } catch (error) {
+      console.error('Vehicle submit error:', error);
+      Alert.alert(
+        'Error',
+        error?.response?.data?.message || 'Vehicle submission failed'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 20 }}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Add Vehicle Details</Text>
-      <TextInput placeholder="Year (e.g. 2020)" keyboardType="numeric" style={styles.input} value={year} onChangeText={setYear} />
-      <DropDownPicker placeholder="Select Make" open={false} value={make} items={makes} setValue={setMake} setItems={setMakes} containerStyle={{ marginBottom: 15 }} />
-      {loadingModels ? <ActivityIndicator size="small" color="#E4572E" /> :
-        make && (
-          <DropDownPicker placeholder="Select Model" open={false} value={model} items={models} setValue={setModel} setItems={setModels} containerStyle={{ marginBottom: 15 }} />
-        )
-      }
-      <TextInput placeholder="License Plate Number" style={styles.input} value={licensePlate} onChangeText={setLicensePlate} />
-      <TextInput placeholder="Registration Number" style={styles.input} value={registrationNumber} onChangeText={setRegistrationNumber} />
 
-      <TouchableOpacity style={styles.uploadBtn} onPress={() => handleDocumentPick('registration')}>
-        <Text style={styles.uploadText}>{registrationFile ? `Uploaded: ${registrationFile.name}` : 'Upload Car Registration'}</Text>
+      {/* Year Dropdown */}
+      <Text style={styles.label}>Year</Text>
+      <DropDownPicker
+        open={yearOpen}
+        value={year}
+        items={yearOptions}
+        setOpen={setYearOpen}
+        setValue={setYear}
+        setItems={() => {}}
+        placeholder="Select year"
+        zIndex={4000}
+        containerStyle={styles.dropdown}
+      />
+
+      {/* Make Dropdown */}
+      <Text style={styles.label}>Make</Text>
+      <DropDownPicker
+        open={makeOpen}
+        value={make}
+        items={makes}
+        setOpen={setMakeOpen}
+        setValue={setMake}
+        setItems={setMakes}
+        placeholder="Select make"
+        zIndex={3000}
+        containerStyle={styles.dropdown}
+      />
+
+      {/* Model Dropdown */}
+      <Text style={styles.label}>Model</Text>
+      <DropDownPicker
+        open={modelOpen}
+        value={model}
+        items={models}
+        setOpen={setModelOpen}
+        setValue={setModel}
+        setItems={setModels}
+        loading={loadingModels}
+        placeholder={make ? 'Select model' : 'Choose make first'}
+        disabled={!make}
+        zIndex={2000}
+        containerStyle={styles.dropdown}
+      />
+
+      {/* License Plate */}
+      <Text style={styles.label}>License Plate</Text>
+      <TextInput
+        style={styles.input}
+        value={licensePlate}
+        onChangeText={setLicensePlate}
+        placeholder="Enter license plate"
+      />
+
+      {/* Registration Number */}
+      <Text style={styles.label}>Registration Number</Text>
+      <TextInput
+        style={styles.input}
+        value={registrationNumber}
+        onChangeText={setRegistrationNumber}
+        placeholder="Enter registration number"
+      />
+
+      {/* Registration File */}
+      <Text style={styles.label}>Registration File (PDF/IMG)</Text>
+      <TouchableOpacity
+        style={styles.fileButton}
+        onPress={pickRegistrationFile}
+      >
+        <Text style={styles.fileButtonText}>
+          {registrationFile ? registrationFile.name || 'File Selected' : 'Upload Registration'}
+        </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.uploadBtn} onPress={() => handleDocumentPick('insurance')}>
-        <Text style={styles.uploadText}>{insuranceFile ? `Uploaded: ${insuranceFile.name}` : 'Upload Car Insurance'}</Text>
+      {/* Insurance File */}
+      <Text style={styles.label}>Insurance File (PDF/IMG)</Text>
+      <TouchableOpacity
+        style={styles.fileButton}
+        onPress={pickInsuranceFile}
+      >
+        <Text style={styles.fileButtonText}>
+          {insuranceFile ? insuranceFile.name || 'File Selected' : 'Upload Insurance'}
+        </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.checkboxRow} onPress={() => setConsent(!consent)}>
-        <View style={[styles.checkbox, consent && styles.checked]} />
-        <Text style={styles.checkboxText}>I confirm this vehicle is valid and registered in my name</Text>
-      </TouchableOpacity>
+      {/* Consent */}
+      <View style={styles.checkboxContainer}>
+        <TouchableOpacity
+          style={[styles.checkbox, consent && styles.checkboxChecked]}
+          onPress={() => setConsent(!consent)}
+        />
+        <Text style={styles.checkboxLabel}>
+          I consent to the terms and confirm details are correct.
+        </Text>
+      </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-        <Text style={styles.buttonText}>Submit Vehicle</Text>
+      {/* Submit */}
+      <TouchableOpacity
+        style={[styles.submitButton, loading && { backgroundColor: '#aaa' }]}
+        onPress={handleSubmit}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.submitButtonText}>Submit Vehicle</Text>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 22, fontWeight: 'bold', color: '#E4572E', marginBottom: 20 },
-  input: { borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 6, marginBottom: 15 },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-  checkbox: { width: 20, height: 20, borderWidth: 1, borderColor: '#aaa', marginRight: 10 },
-  checked: { backgroundColor: '#E4572E' },
-  checkboxText: { flex: 1 },
-  uploadBtn: { padding: 12, backgroundColor: '#eee', borderRadius: 6, marginBottom: 15 },
-  uploadText: { color: '#333' },
-  button: { backgroundColor: '#E4572E', padding: 15, borderRadius: 8 },
-  buttonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+  container: {
+    padding: 20,
+    paddingBottom: 50,
+    backgroundColor: '#fff',
+    flexGrow: 1
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginVertical: 15,
+    color: '#c15016'
+  },
+  label: {
+    marginTop: 12,
+    marginBottom: 6,
+    fontWeight: '600'
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: '#fafafa'
+  },
+  dropdown: {
+    marginBottom: 8
+  },
+  fileButton: {
+    backgroundColor: '#eee',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  fileButtonText: {
+    color: '#c15016',
+    fontWeight: '500'
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 16
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderWidth: 2,
+    borderColor: '#c15016',
+    borderRadius: 6,
+    marginRight: 10,
+    backgroundColor: '#fff'
+  },
+  checkboxChecked: {
+    backgroundColor: '#c15016'
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    flexShrink: 1
+  },
+  submitButton: {
+    backgroundColor: '#c15016',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: 16
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 17
+  }
 });

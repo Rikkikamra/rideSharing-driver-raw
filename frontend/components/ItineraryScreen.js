@@ -1,22 +1,31 @@
+import React, { useContext } from "react";
+import { View, Text } from "react-native";
+import { BookingContext } from "../context/BookingContext";
 
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+const ItineraryScreen = () => {
+  const { booking } = useContext(BookingContext);
 
-const ItineraryScreen = ({ from, to, date, fare }) => {
+  if (!booking) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <Text>No booking selected.</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Trip Itinerary</Text>
-      <Text>From: {from}</Text>
-      <Text>To: {to}</Text>
-      <Text>Date: {date}</Text>
-      <Text>Estimated Fare: ${fare}</Text>
+    <View style={{ flex: 1, padding: 16 }}>
+      <Text style={{ fontWeight: "bold" }}>{booking.date}</Text>
+      <Text>
+        {booking.from} → {booking.to}
+      </Text>
+      <Text>{booking.rideType}</Text>
+      <Text style={{ fontSize: 18 }}>{booking.price}</Text>
+      <Text style={{ color: booking.status === "Booked" ? "green" : "orange" }}>
+        {booking.status}
+      </Text>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: { padding: 20 },
-  header: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 }
-});
 
 export default ItineraryScreen;

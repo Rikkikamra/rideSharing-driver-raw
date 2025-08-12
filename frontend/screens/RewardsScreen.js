@@ -1,83 +1,129 @@
-
 import React, { useEffect, useState, useContext } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import RewardsDisplay from '../components/RewardsDisplay';
-import { ThemeContext } from '../context/ThemeContext';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import api from '../utils/api';
+import { AuthContext } from '../context/AuthProvider';
 
-const RewardsScreen = () => {
-  const { theme } = useContext(ThemeContext);
+export default function RewardsScreen() {
+  const { user } = useContext(AuthContext);
+  const { colors } = useTheme();
+
   const [points, setPoints] = useState(0);
-  const [tier, setTier] = useState('Bronze');
+  const [tier, setTier] = useState('');
   const [badges, setBadges] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Simulate fetching rewards data
-    const userData = {
-      points: 960,
-      tier: 'Silver',
-      badges: ['First Ride', '5-Star Rider', 'Referral Champ'],
+    let mounted = true;
+    if (!user?.id) return;
+    api
+      .get(`/rewards/${user.id}`)
+      .then((res) => {
+        if (mounted) {
+          setPoints(res.data.points || 0);
+          setTier(res.data.currentTier || res.data.tier || '');
+          setBadges(res.data.badges || []);
+        }
+      })
+      .catch(() => {
+        if (mounted) setError('Unable to load rewards.');
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+        mounted = false;
     };
-    setPoints(userData.points);
-    setTier(userData.tier);
-    setBadges(userData.badges);
-  }, []);
+  }, [user?.id]);
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.center}>
+        <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.header, { color: theme.text }]}>Your Rewards</Text>
-      <RewardsDisplay points={points} tier={tier} />
-
-      <Text style={[styles.subHeader, { color: theme.text }]}>Earn More Points</Text>
-      <TouchableOpacity style={[styles.card, { backgroundColor: theme.card }]}>
-        <Text style={[styles.cardText, { color: theme.text }]}>🎁 Refer a friend and earn 100 points!</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.card, { backgroundColor: theme.card }]}>
-        <Text style={[styles.cardText, { color: theme.text }]}>🧾 Complete 5 rides this month for a bonus!</Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.subHeader, { color: theme.text }]}>Badges Earned</Text>
-      {badges.map((badge, index) => (
-        <View key={index} style={[styles.badge, { backgroundColor: theme.accent }]}>
-          <Text style={styles.badgeText}>🏅 {badge}</Text>
-        </View>
-      ))}
-    </ScrollView>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.header, { color: colors.primary }]}>Your Rewards</Text>
+      <View style={styles.summary}>
+        <Text style={[styles.points, { color: colors.text }]}>{points} Points</Text>
+        <Text style={[styles.tier, { color: colors.text }]}>{tier} Tier</Text>
+      </View>
+      <Text style={[styles.subheader, { color: colors.text }]}>Badges</Text>
+      <FlatList
+        data={badges}
+        keyExtractor={(item, idx) => `${item}-${idx}`}
+        renderItem={({ item }) => (
+          <View style={[styles.badgeContainer, { borderColor: colors.border }]}>
+            <Text style={[styles.badgeText, { color: colors.text }]}>{item}</Text>
+          </View>
+        )}
+        contentContainerStyle={styles.badgesList}
+      />
+    </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
+    flex: 1,
+    padding: 16,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
   },
   header: {
     fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    fontWeight: '700',
+    marginBottom: 16,
   },
-  subHeader: {
+  summary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  points: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  tier: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  subheader: {
     fontSize: 18,
     fontWeight: '600',
-    marginTop: 30,
-    marginBottom: 10,
-  },
-  card: {
-    padding: 16,
-    borderRadius: 8,
     marginBottom: 12,
   },
-  cardText: {
-    fontSize: 16,
+  badgesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
-  badge: {
-    padding: 10,
+  badgeContainer: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
     borderRadius: 20,
-    marginBottom: 10,
-    alignItems: 'center',
+    marginRight: 8,
+    marginBottom: 8,
   },
   badgeText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    fontSize: 14,
   },
 });
-
-export default RewardsScreen;

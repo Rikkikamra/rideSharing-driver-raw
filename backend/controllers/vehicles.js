@@ -1,30 +1,41 @@
 const Vehicle = require('../models/Vehicle');
 
-exports.getAllVehicles = async (req, res) => {
+// Fetch verified vehicles for the authenticated driver.  Always use the
+// authenticated user ID to prevent spoofing and avoid variable shadowing.
+exports.getVerifiedVehicles = async (req, res) => {
   try {
-    const vehicles = await Vehicle.find({});
-    res.json(vehicles);
+    const driverId = req.user.id;
+    const vehicles = await Vehicle.find({ driver: driverId, approved: true });
+    return res.json({ success: true, vehicles });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch vehicles' });
+    console.error('Fetch vehicles error:', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch vehicles' });
   }
 };
 
-exports.addVehicle = async (req, res) => {
+// Submit a new vehicle (with files)
+exports.submitVehicle = async (req, res) => {
   try {
-    const vehicle = new Vehicle(req.body);
-    await vehicle.save();
-    res.status(201).json({ success: true, vehicle });
-  } catch (err) {
-    res.status(400).json({ error: 'Failed to add vehicle' });
-  }
-};
+    const driverId = req.user?.id;
+    if (!driverId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized: No driver ID' });
+    }
 
-exports.getVehicleByDriver = async (req, res) => {
-  try {
-    const driverId = req.params.driverId;
-    const vehicles = await Vehicle.find({ driverId });
-    res.json(vehicles);
+    const registrationFilePath = req.files?.registrationFile?.[0]?.path || '';
+    const insuranceFilePath = req.files?.insuranceFile?.[0]?.path || '';
+
+    const newVehicle = new Vehicle({
+      ...req.body,
+      driver: driverId,
+      verified: false,
+      registrationFile: registrationFilePath,
+      insuranceFile: insuranceFilePath
+    });
+
+    await newVehicle.save();
+    res.json({ success: true, message: 'Vehicle submitted for review' });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch vehicles for driver' });
+    console.error('Submit vehicle error:', err);
+    res.status(500).json({ success: false, message: 'Vehicle submission failed' });
   }
 };
